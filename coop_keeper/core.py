@@ -203,10 +203,10 @@ class EnviroVars(Thread):
         return os.environ.get('DOOR_OPEN', Coop.UNKNOWN), os.environ.get('DOOR_CLOSED', Coop.UNKNOWN)
     
     def set_open(self, state):
-        os.environ["DOOR_OPEN"] = state
+        os.environ["DOOR_OPEN"] = str(state)
     
     def set_closed(self, state):
-        os.environ["DOOR_CLOSED"] = state
+        os.environ["DOOR_CLOSED"] = str(state)
 
     def run(self):
         while True:
