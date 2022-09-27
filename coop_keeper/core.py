@@ -248,12 +248,12 @@ class CoopClock(Thread):
                     logger.info("Door should be closed based on time of day")
                     self.ck.close_door()
                     Event().wait(30)
-                    self.ck.envirovars.set_closed(1)
+                    self.ck.enviro_vars.set_closed(1)
 
                 elif self.current_time > self.open_time and self.current_time < self.close_time \
                         and self.ck.door_status != Coop.OPEN and self.ck.direction != Coop.OPENING:
                     logger.info("Door should be open based on time of day")
                     self.ck.open_door()
                     Event().wait(30)
-                    self.ck.envirovars.set_open(1)
+                    self.ck.enviro_vars.set_open(1)
             Event().wait(1)
