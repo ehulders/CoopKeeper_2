@@ -200,7 +200,7 @@ class EnviroVars(Thread):
 
     def get_status(self):
         # returns "1" for triggered and "0" for not-triggered
-        return int(os.environ.get('DOOR_OPEN'), int(Coop.UNKNOWN), os.environ.get('DOOR_CLOSED', Coop.UNKNOWN))
+        return int(os.environ.get('DOOR_OPEN', Coop.UNKNOWN)), int(os.environ.get('DOOR_CLOSED', Coop.UNKNOWN))
     
     def set_open(self, state):
         os.environ["DOOR_OPEN"] = str(state)
