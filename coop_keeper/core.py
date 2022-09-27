@@ -207,10 +207,12 @@ class EnviroVars(Thread):
         return int(os.environ.get('DOOR_OPEN', Coop.UNKNOWN)), int(os.environ.get('DOOR_CLOSED', Coop.UNKNOWN))
     
     def set_open(self, state):
-        os.environ["DOOR_OPEN"] = str(state)
+        os.system("export DOOR_OPEN={}".format(str(state)))
+        #os.environ["DOOR_OPEN"] = str(state)
     
     def set_closed(self, state):
-        os.environ["DOOR_CLOSED"] = str(state)
+        os.system("export DOOR_CLOSED={}".format(str(state)))
+        #os.environ["DOOR_CLOSED"] = str(state)
 
     def run(self):
         while True:
