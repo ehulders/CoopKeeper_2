@@ -5,6 +5,7 @@ import datetime as dt
 import logging
 import asyncio
 import os
+import subprocess
 
 import RPi.GPIO as GPIO
 
@@ -207,11 +208,15 @@ class EnviroVars(Thread):
         return int(os.environ.get('DOOR_OPEN', Coop.UNKNOWN)), int(os.environ.get('DOOR_CLOSED', Coop.UNKNOWN))
     
     def set_open(self, state):
-        os.system("export DOOR_OPEN={}".format(str(state)))
+        exit_status = subprocess.run(["export", "DOOR_OPEN={}".format(str(state))])
+        print(exit_status)
+        #os.system("export DOOR_OPEN={}".format(str(state)))
         #os.environ["DOOR_OPEN"] = str(state)
     
     def set_closed(self, state):
-        os.system("export DOOR_CLOSED={}".format(str(state)))
+        exit_status = subprocess.run(["export", "DOOR_CLOSED={}".format(str(state))])
+        print(exit_status)
+        #os.system("export DOOR_CLOSED={}".format(str(state)))
         #os.environ["DOOR_CLOSED"] = str(state)
 
     def run(self):
