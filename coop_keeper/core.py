@@ -76,7 +76,7 @@ class CoopKeeper:
         self.stop_door(0)
 
     def close_door(self):
-        open, closed = self.triggers.get_status()
+        open, closed = self.enviro_vars.get_status()
         if closed == Coop.TRIGGERED:
             msg = "Door is already closed"
             logger.info(msg)
@@ -92,7 +92,7 @@ class CoopKeeper:
         return msg
 
     def open_door(self):
-        open, closed = self.triggers.get_status()
+        open, closed = self.enviro_vars.get_status()
         if open == Coop.TRIGGERED:
             msg = "Door is already open"
             logger.info(msg)
@@ -117,7 +117,7 @@ class CoopKeeper:
             self.direction = Coop.IDLE
             self.started_motor = None
 
-        open, closed = self.triggers.get_status()
+        open, closed = self.enviro_vars.get_status()
         
         if open == Coop.TRIGGERED:
             logger.info("Door is open")
