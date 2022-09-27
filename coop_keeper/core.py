@@ -208,14 +208,12 @@ class EnviroVars(Thread):
         return int(os.environ.get('DOOR_OPEN', Coop.UNKNOWN)), int(os.environ.get('DOOR_CLOSED', Coop.UNKNOWN))
     
     def set_open(self, state):
-        exit_status = subprocess.run(["export", "DOOR_OPEN={}".format(str(state))])
-        print(exit_status)
+        subprocess.Popen("export DOOR_OPEN={}".format(str(state)), shell=True)
         #os.system("export DOOR_OPEN={}".format(str(state)))
         #os.environ["DOOR_OPEN"] = str(state)
     
     def set_closed(self, state):
-        exit_status = subprocess.run(["export", "DOOR_CLOSED={}".format(str(state))])
-        print(exit_status)
+        subprocess.Popen("export DOOR_CLOSED={}".format(str(state)), shell=True)
         #os.system("export DOOR_CLOSED={}".format(str(state)))
         #os.environ["DOOR_CLOSED"] = str(state)
 
