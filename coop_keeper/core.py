@@ -77,6 +77,7 @@ class CoopKeeper:
 
     def close_door(self):
         open, closed = self.enviro_vars.get_status()
+        print("open: {}, closed: {}".format(open, closed))
         if closed == Coop.TRIGGERED:
             msg = "Door is already closed"
             logger.info(msg)
@@ -93,6 +94,7 @@ class CoopKeeper:
 
     def open_door(self):
         open, closed = self.enviro_vars.get_status()
+        print("open: {}, closed: {}".format(open, closed))
         if open == Coop.TRIGGERED:
             msg = "Door is already open"
             logger.info(msg)
