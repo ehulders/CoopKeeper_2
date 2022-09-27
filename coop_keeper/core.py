@@ -83,6 +83,7 @@ class CoopKeeper:
             logger.info(msg)
             return msg
         self.enviro_vars.set_closed(0)
+        self.enviro_vars.set_open(0)
         msg = "Closing door"
         logger.info(msg)
         self.started_motor = dt.datetime.now()
@@ -99,6 +100,7 @@ class CoopKeeper:
             msg = "Door is already open"
             logger.info(msg)
             return msg
+        self.enviro_vars.set_closed(0)
         self.enviro_vars.set_open(0)
         msg = "Opening door"
         logger.info(msg)
@@ -251,6 +253,7 @@ class CoopClock(Thread):
                     self.ck.close_door()
                     Event().wait(30)
                     self.ck.enviro_vars.set_closed(1)
+                    self.ck.enviro_vars.set_open(0)
 
                 elif self.current_time > self.open_time and self.current_time < self.close_time \
                         and self.ck.door_status != Coop.OPEN and self.ck.direction != Coop.OPENING:
@@ -258,4 +261,5 @@ class CoopClock(Thread):
                     self.ck.open_door()
                     Event().wait(30)
                     self.ck.enviro_vars.set_open(1)
+                    self.ck.enviro_vars.set_closed(0)
             Event().wait(1)
