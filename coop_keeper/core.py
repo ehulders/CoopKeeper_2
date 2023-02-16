@@ -62,17 +62,24 @@ class Debug(Thread):
     def __init__(self, ck):
         Thread.__init__(self)
         self.ck = ck
+        self.status = {
+            "state": self.ck.door.present_state(), 
+            "mode":  self.ck.door.present_mode(), 
+            "position":  self.ck.door.present_position()
+            }
         self.setDaemon(True)
         self.start()
     
     def run(self):
-        while True:                
-            print("state: {}, mode: {}, position: {}".format(
-                self.ck.door.present_state(), 
-                self.ck.door.present_mode(), 
-                self.ck.door.present_position()
-                )
-                  )
+        while True:
+            new_status = {
+            "state": self.ck.door.present_state(), 
+            "mode":  self.ck.door.present_mode(), 
+            "position":  self.ck.door.present_position()
+            }            
+            if new_status != self.status:
+                logger.info(new_status)
+                self.status = new_status
             Event().wait(1)
     
     
