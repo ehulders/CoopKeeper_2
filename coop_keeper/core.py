@@ -76,7 +76,7 @@ class Door:
     
     def set_mode(self, mode: Mode):
         self._mode = mode
-        self._mode.ck = self
+        self._mode.door = self
 
     def present_state(self):
         #logger.info(f"CoopKeeper door is {type(self._state).__name__}")
@@ -173,13 +173,13 @@ class Auto(Mode):
     def hold_close_button(self):
         msg = "CoopKeeper switching to manual."
         logger.info(msg)
-        self.ck.set_mode(Manual())
+        self.door.set_mode(Manual())
         return msg
 
     def hold_open_button(self):
         msg = "CoopKeeper switching to manual."
         logger.info(msg)
-        self.ck.set_mode(Manual())
+        self.door.set_mode(Manual())
         return msg
 
 
@@ -187,13 +187,13 @@ class Manual(Mode):
     def hold_close_button(self):
         msg = "CoopKeeper switching to auto."
         logger.info(msg)
-        self.ck.set_mode(Auto())
+        self.door.set_mode(Auto())
         return msg
 
     def hold_open_button(self):
         msg = "CoopKeeper switching to auto."
         logger.info(msg)
-        self.ck.set_mode(Auto())
+        self.door.set_mode(Auto())
         return msg
 
 
@@ -236,5 +236,10 @@ class CoopClock(Thread):
                     logger.info("Door should be open based on time of day")
                     self.ck.door.push_open_button()
                     #Event().wait(5)
-
+            else:
+                Event().wait(300)
+                logger.info("Returning to manual mode in 5 seconds.")
+                Event().wait(5)
+                self.ck.door.hold_open_button()
+                
             Event().wait(1)

@@ -22,7 +22,7 @@ def get_app():
     return app
 
 
-@app.get("/door/{door_action}")
+@app.put("/door/{door_action}")
 async def door(
         door_action: str,
         request: Request,
@@ -37,7 +37,10 @@ async def door(
             app.ck.door.hold_open_button()
         result = app.ck.door.push_close_button()
     elif door_action == 'auto':
-        result = app.ck.door.hold_close_button()
+        if app.ck.door.present_mode() == "Manual":
+            result = app.ck.door.hold_close_button()
+        else:
+            result = 'CoopKeeper already in Auto mode.'
     else:
         response.status_code = 400
         return {"result": "invalid action requested"}
