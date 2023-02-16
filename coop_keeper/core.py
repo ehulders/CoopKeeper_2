@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import MutableSequence
 import pytz
 import time
@@ -7,10 +8,12 @@ import asyncio
 import os
 import subprocess
 
-import RPi.GPIO as GPIO
+#import RPi.GPIO as GPIO
 
 from threading import Thread, Event
 from astral import Astral
+
+from abc import ABC, abstractmethod
 
 
 APP_NAME = "CoopKeeper"
@@ -28,18 +31,7 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
-
-class Coop:
-    MAX_MANUAL_MODE_TIME = 60 * 10
-    MAX_MOTOR_ON = 30
-    TIMEZONE_CITY = 'Seattle'
-    AFTER_SUNSET_DELAY = 10
-    AFTER_SUNRISE_DELAY = 0
-    IDLE = UNKNOWN = AUTO = 0
-    OPENING = OPEN = TRIGGERED = MANUAL = 1
-    CLOSING = CLOSED = HALT = 2
-
-
+"""
 class GPIOInit:
     PIN_LED = 5
     PIN_BUTTON_UP = 4
@@ -60,180 +52,163 @@ class GPIOInit:
         GPIO.setup(GPIOInit.PIN_SENSOR_TOP, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         GPIO.setup(GPIOInit.PIN_BUTTON_UP, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         GPIO.setup(GPIOInit.PIN_BUTTON_DOWN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+"""
+
+class Location:
+    
+    TIMEZONE_CITY = 'Seattle'
+    AFTER_SUNSET_DELAY = 10
+    AFTER_SUNRISE_DELAY = 0
+
+
+class Door:
+    
+    _state = None
+    _mode = None
+
+    def __init__(self, state: State, mode: Mode) -> None:
+        self.set_state(state)
+        self.set_mode(mode)
+
+    def set_state(self, state: State):
+        self._state = state
+        self._state.door = self
+    
+    def set_mode(self, mode: Mode):
+        self._mode = mode
+        self._mode.ck = self
+
+    def present_state(self):
+        #logger.info(f"CoopKeeper door is {type(self._state).__name__}")
+        return type(self._state).__name__
+
+    def present_mode(self):
+        #logger.info(f"CoopKeeper mode is {type(self._mode).__name__}")
+        return type(self._mode).__name__
+
+    def push_open_button(self):
+        self._state.push_open_button()
+
+    def push_close_button(self):
+        self._state.push_close_button()
+    
+    def hold_open_button(self):
+        self._mode.hold_open_button()
+
+    def hold_close_button(self):
+        self._mode.hold_close_button()
+
+    def push_both_buttons(self) -> None:
+        logger.warning("Oops.. you should press one button at a time")
+
+    def no_button_pushed(self) -> None:
+        logger.info("Press any button. Open or close")
+
+ 
+class State(ABC):
+    @property
+    def door(self) -> Door:
+        return self._door
+
+    @door.setter
+    def door(self, door: Door) -> None:
+        self._door = door
+
+    @abstractmethod
+    def push_open_button(self) -> None:
+        pass
+
+    @abstractmethod
+    def push_close_button(self) -> None:
+        pass
+
+
+class Closed(State):
+    def push_close_button(self):
+        msg = f"CoopKeeper door is already {type(self.door._state).__name__}"
+        logger.warning(msg)
+        return msg
+
+    def push_open_button(self):
+        msg = "Door is opening."
+        logger.info(msg)
+        logger.info("Door is open.")
+        self.door.set_state(Open())
+        return msg
+
+
+class Open(State):
+    def push_close_button(self):
+        msg = "Door is closing"
+        logger.info(msg)
+        logger.info("Door is closed.")
+        self.door.set_state(Closed())
+        return msg
+
+    def push_open_button(self):
+        msg = f"CoopKeeper door is already {type(self.door._state).__name__}"
+        logger.warning(msg)
+        return msg
+
+
+class Mode(ABC):
+    @property
+    def door(self) -> Door:
+        return self._door
+
+    @door.setter
+    def door(self, door: Door) -> None:
+        self._door = door
+
+    @abstractmethod
+    def hold_open_button(self) -> None:
+        pass
+
+    @abstractmethod
+    def hold_close_button(self) -> None:
+        pass
+
+
+class Auto(Mode):
+    def hold_close_button(self):
+        msg = "CoopKeeper switching to manual."
+        logger.info(msg)
+        self.ck.set_mode(Manual())
+        return msg
+
+    def hold_open_button(self):
+        msg = "CoopKeeper switching to manual."
+        logger.info(msg)
+        self.ck.set_mode(Manual())
+        return msg
+
+
+class Manual(Mode):
+    def hold_close_button(self):
+        msg = "CoopKeeper switching to auto."
+        logger.info(msg)
+        self.ck.set_mode(Auto())
+        return msg
+
+    def hold_open_button(self):
+        msg = "CoopKeeper switching to auto."
+        logger.info(msg)
+        self.ck.set_mode(Auto())
+        return msg
 
 
 class CoopKeeper:
     def __init__(self):
-        GPIOInit()
-        self.door_status = Coop.UNKNOWN
-        self.started_motor = None
-        self.direction = Coop.IDLE
-        self.door_mode = Coop.AUTO
-        self.manual_mode_start = 0
-        self.buttons = Buttons(self)
-        self.enviro_vars = EnviroVars(self)
+        #GPIOInit()
+        self.door = Door(Closed(), Auto())
+        #self.buttons = Buttons(self)
+        #self.enviro_vars = EnviroVars(self)
         self.coop_time = CoopClock(self)
-        self.set_mode(Coop.AUTO)
-        self.stop_door(0)
 
-    def close_door(self):
-        open, closed = self.enviro_vars.get_status()
-        print("open: {}, closed: {}".format(open, closed))
-        if closed == Coop.TRIGGERED:
-            msg = "Door is already closed"
-            logger.info(msg)
-            return msg
-        self.enviro_vars.set_closed(0)
-        self.enviro_vars.set_open(0)
-        msg = "Closing door"
-        logger.info(msg)
-        self.started_motor = dt.datetime.now()
-        GPIO.output(GPIOInit.PIN_MOTOR_ENABLE, GPIO.HIGH)
-        GPIO.output(GPIOInit.PIN_MOTOR_A, GPIO.LOW)
-        GPIO.output(GPIOInit.PIN_MOTOR_B, GPIO.HIGH)
-        self.direction = Coop.CLOSING
-        return msg
-
-    def open_door(self):
-        open, closed = self.enviro_vars.get_status()
-        print("open: {}, closed: {}".format(open, closed))
-        if open == Coop.TRIGGERED:
-            msg = "Door is already open"
-            logger.info(msg)
-            return msg
-        self.enviro_vars.set_closed(0)
-        self.enviro_vars.set_open(0)
-        msg = "Opening door"
-        logger.info(msg)
-        self.started_motor = dt.datetime.now()
-        GPIO.output(GPIOInit.PIN_MOTOR_ENABLE, GPIO.HIGH)
-        GPIO.output(GPIOInit.PIN_MOTOR_A, GPIO.HIGH)
-        GPIO.output(GPIOInit.PIN_MOTOR_B, GPIO.LOW)
-        self.direction= Coop.OPENING
-        return msg
-
-    def stop_door(self, delay=0):
-        if self.direction != Coop.IDLE:
-            logger.info("Stop door")
-            time.sleep(delay)
-            GPIO.output(GPIOInit.PIN_MOTOR_ENABLE, GPIO.LOW)
-            GPIO.output(GPIOInit.PIN_MOTOR_A, GPIO.LOW)
-            GPIO.output(GPIOInit.PIN_MOTOR_B, GPIO.LOW)
-            self.direction = Coop.IDLE
-            self.started_motor = None
-
-        open, closed = self.enviro_vars.get_status()
-        
-        if open == Coop.TRIGGERED:
-            logger.info("Door is open")
-            self.door_status = Coop.OPEN
-        elif closed == Coop.TRIGGERED:
-            logger.info("Door is closed")
-            self.door_status = Coop.CLOSED
-        else:
-            logger.info("Door is in an unknown state")
-            self.door_status = Coop.UNKNOWN
-            payload = {'status': self.door_status, 'ts': dt.datetime.now()}
-    
-    def set_mode(self, new_mode):
-        if new_mode == Coop.AUTO:
-            msg = "Entering auto mode"
-            logger.info(msg)
-            self.door_mode = Coop.AUTO
-            GPIO.output(GPIOInit.PIN_LED, GPIO.HIGH)
-        else:
-            msg = "Entering manual mode"
-            logger.info(msg)
-            self.door_mode = new_mode
-            self.manual_mode_start = int(time.time())
-            Blink(self)
-        return msg
-
-
-class Blink(Thread):
-    def __init__(self, ck):
-        Thread.__init__(self)
-        self.ck = ck
-        self.setDaemon(True)
-        self.start()
-
-    def run(self):
-        while(self.ck.door_mode != Coop.AUTO):
-            GPIO.output(GPIOInit.PIN_LED, GPIO.LOW)
-            Event().wait(1)
-            GPIO.output(GPIOInit.PIN_LED, GPIO.HIGH)
-            Event().wait(1)
-            if self.ck.door_mode == Coop.MANUAL: 
-                if int(time.time()) - self.ck.manual_mode_start > Coop.MAX_MANUAL_MODE_TIME:
-                    logger.info("In manual mode too long, switching to auto")
-                    self.ck.set_mode(Coop.AUTO)
-
-
-class Buttons:
-    def __init__(self, ck):
-        self.ck = ck
-        GPIO.add_event_detect(GPIOInit.PIN_BUTTON_UP, GPIO.FALLING, callback=self.press, bouncetime=300)
-        GPIO.add_event_detect(GPIOInit.PIN_BUTTON_DOWN, GPIO.FALLING, callback=self.press, bouncetime=300)
-
-    def press(self, button):
-        start = int(round(time.time() * 1000))
-        while GPIO.input(button) == 0:
-            pass
-        end = int(round(time.time() * 1000))
-        if end - start > 4000:
-            if self.ck.door_mode == Coop.AUTO:
-                self.ck.set_mode(Coop.MANUAL)
-            else:
-                self.ck.set_mode(Coop.AUTO)
-        if self.ck.door_mode == Coop.MANUAL:
-            if end - start < 4000:
-                if self.ck.direction != Coop.IDLE:
-                    self.ck.stop_door(0)
-                elif button == GPIOInit.PIN_BUTTON_UP:
-                    self.ck.open_door()
-                else:
-                    self.ck.close_door()
-
-
-class EnviroVars(Thread):
-
-    def __init__(self, ck):
-        Thread.__init__(self) 
-        self.ck = ck
-        self.setDaemon(True)
-        self.start()
-
-    def get_status(self):
-        # returns "1" for triggered and "0" for not-triggered
-        return int(os.environ.get('DOOR_OPEN', Coop.UNKNOWN)), int(os.environ.get('DOOR_CLOSED', Coop.UNKNOWN))
-    
-    def set_open(self, state):
-        subprocess.Popen("export DOOR_OPEN={}".format(str(state)), shell=True)
-        #os.system("export DOOR_OPEN={}".format(str(state)))
-        #os.environ["DOOR_OPEN"] = str(state)
-    
-    def set_closed(self, state):
-        subprocess.Popen("export DOOR_CLOSED={}".format(str(state)), shell=True)
-        #os.system("export DOOR_CLOSED={}".format(str(state)))
-        #os.environ["DOOR_CLOSED"] = str(state)
-
-    def run(self):
-        while True:
-            open, closed = self.get_status()
-
-            if self.ck.direction == Coop.OPENING and open == Coop.TRIGGERED:
-                logger.info("Top sensor triggered - env_vars says door open")
-                self.ck.stop_door(0)
-
-            if self.ck.direction == Coop.CLOSING and closed == Coop.TRIGGERED:
-                logger.info("Bottom sensor triggered - env_vars says door closed")
-                self.ck.stop_door(0)
-            Event().wait(1)
-            
 
 class CoopClock(Thread):
     a = Astral()
-    city = a[Coop.TIMEZONE_CITY]
+    city = a[Location.TIMEZONE_CITY]
 
     def __init__(self, ck):
         Thread.__init__(self)
@@ -246,25 +221,20 @@ class CoopClock(Thread):
 
     def run(self):
         while True:
-            if self.ck.door_mode == Coop.AUTO:
+            if self.ck.door.present_mode() == "Auto":
                 sun = self.city.sun(date=dt.datetime.now(), local=True)
-                self.open_time = sun["sunrise"] + dt.timedelta(minutes=Coop.AFTER_SUNRISE_DELAY)
-                self.close_time = sun["sunset"] + dt.timedelta(minutes=Coop.AFTER_SUNSET_DELAY)
+                self.open_time = sun["sunrise"] + dt.timedelta(minutes=Location.AFTER_SUNRISE_DELAY)
+                self.close_time = sun["sunset"] + dt.timedelta(minutes=Location.AFTER_SUNSET_DELAY)
                 self.current_time = dt.datetime.now(pytz.timezone(self.city.timezone))
 
-                if (self.current_time < self.open_time or self.current_time > self.close_time) \
-                        and self.ck.door_status != Coop.CLOSED and self.ck.direction != Coop.CLOSING:
+                if (self.current_time < self.open_time or self.current_time > self.close_time) and self.ck.door.present_state() != "Closed":
                     logger.info("Door should be closed based on time of day")
-                    self.ck.close_door()
-                    Event().wait(30)
-                    self.ck.enviro_vars.set_closed(1)
-                    self.ck.enviro_vars.set_open(0)
+                    self.ck.door.push_close_button()
+                    #Event().wait(5)
 
-                elif self.current_time > self.open_time and self.current_time < self.close_time \
-                        and self.ck.door_status != Coop.OPEN and self.ck.direction != Coop.OPENING:
+                elif self.current_time > self.open_time and self.current_time < self.close_time and self.ck.door.present_state() != "Open":
                     logger.info("Door should be open based on time of day")
-                    self.ck.open_door()
-                    Event().wait(30)
-                    self.ck.enviro_vars.set_open(1)
-                    self.ck.enviro_vars.set_closed(0)
+                    self.ck.door.push_open_button()
+                    #Event().wait(5)
+
             Event().wait(1)

@@ -19,9 +19,10 @@ gen
 
 ### Python template
 # Byte-compiled / optimized / DLL files
-tasks/__pycache__/
+coop_keeper/__pycache__/
 *.py[cod]
 *$py.class
+coop_keeper/*.pyc
 
 # C extensions
 *.so

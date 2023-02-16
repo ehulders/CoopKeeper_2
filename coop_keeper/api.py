@@ -1,7 +1,7 @@
 import uvicorn
-import RPi.GPIO as GPIO
+#import RPi.GPIO as GPIO
 
-from .core import Coop, CoopKeeper, GPIOInit
+from .core import Location, CoopKeeper#, GPIOInit
 from fastapi import FastAPI, Header, Request, Response
 from pydantic import BaseModel
 
@@ -22,27 +22,29 @@ def get_app():
     return app
 
 
-@app.get("/api/v1/door/{door_action}")
+@app.get("/door/{door_action}")
 async def door(
         door_action: str,
         request: Request,
         response: Response,
     ):
     if door_action == 'open':
-        app.ck.set_mode(Coop.MANUAL)
-        result = app.ck.open_door()
+        if app.ck.door.present_mode() == "Auto":
+            app.ck.door.hold_open_button()
+        result = app.ck.door.push_open_button()
     elif door_action == 'close':
-        app.ck.set_mode(Coop.MANUAL)
-        result = app.ck.close_door()
+        if app.ck.door.present_mode() == "Auto":
+            app.ck.door.hold_open_button()
+        result = app.ck.door.push_close_button()
     elif door_action == 'auto':
-        result = app.ck.set_mode(Coop.AUTO)
+        result = app.ck.door.hold_close_button()
     else:
         response.status_code = 400
         return {"result": "invalid action requested"}
     return {"result": result}
 
 
-@app.get("/api/v1/debug/{thing}")
+@app.get("/debug/{thing}")
 async def debug(
         thing: str,
         request: Request,
@@ -64,5 +66,5 @@ async def debug(
 def main():
     #uvicorn.run("start:app", host="0.0.0.0", port=5005, reload=True, log_level='info')
     get_app()
-    GPIO.output(GPIOInit.PIN_LED, GPIO.LOW)
-    app.ck.stop_door()
+    #GPIO.output(GPIOInit.PIN_LED, GPIO.LOW)
+    #app.ck.stop_door()
