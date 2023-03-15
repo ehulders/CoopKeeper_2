@@ -60,6 +60,8 @@ async def debug(
                   app.ck.coop_time.open_time,
                   'close_time':
                   app.ck.coop_time.close_time}
+    elif thing == 'state':
+        result = app.ck.debug.status
     else:
         response.status_code = 400
         return {"result": "invalid thing requested"}
