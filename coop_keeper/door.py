@@ -8,7 +8,7 @@ class Door:
     
     _state = None       # idle, opening, or closing
     _mode = None        # auto or manual
-    _position = None    # open or closed
+    _position = None    # open, closed, or neutral
 
     def __init__(self, state: State, mode: Mode, position: Position) -> None:
         self.set_state(state)

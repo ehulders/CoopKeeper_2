@@ -52,7 +52,7 @@ async def debug(
         thing: str,
         request: Request,
         response: Response,
-    ):
+    ):  
     if thing == 'time':
         result = {'current_time':
                   app.ck.coop_time.current_time,
